@@ -1,13 +1,24 @@
-// List of buzzwords that indicate potential ghost job postings
+// List of buzzwords for ghost job detection
 const ghostJobBuzzwords = [
-    "Uncapped earning potential", "Unlimited growth opportunity", "Work hard, play hard",
-    "We’re like a family", "Rockstar", "Ninja", "Guru", "Fast-paced environment", "Self-starter",
-    "Work from anywhere", "Get in on the ground floor", "Exciting startup culture",
-    "Perfect for recent graduates", "Looking for a hustler", "Competitive commission-based",
-    "Immediate hire", "Flexible schedule", "All training provided", "No experience necessary",
-    "Make money fast", "Be your own boss", "Earn passive income", "Potential to grow within the company",
-    "Seeking ambitious individuals", "High-energy environment", "Must be comfortable with uncertainty",
-    "Rapid advancement opportunity"
+    "dynamic work environment", "self-starter", "fast-paced",
+    "wear many hats", "flexible", "motivated", 
+    "great company culture", "fun work environment", 
+    "like a family", "results-oriented", "entry-level", 
+    "competitive salary", "fast track", "uncapped commission",
+    "immediate start", "reliable team player", 
+    "passionate about excellence", "work hard, play hard", 
+    "upbeat environment", "cutting-edge", "innovative solutions",
+    "start-up atmosphere", "seeking superstars", "best-in-class", 
+    "out-of-the-box thinker", "go-getter"
+];
+
+// List of vague terms
+const vagueTerms = [
+    "dynamic work environment", "self-starter", "team player", 
+    "fast-paced", "wear many hats", "flexible", "motivated", 
+    "relevant experience", "industry knowledge", "make an impact",
+    "any relevant experience", "industry practices", "great company culture",
+    "fun work environment", "like a family", "variety of responsibilities"
 ];
 
 // Function to capture salary details from the button element
@@ -18,11 +29,6 @@ function captureSalaryDetails() {
 // Function to check if the job contains a dollar sign ($)
 function containsSalary(text) {
     return text.includes('$');
-}
-
-// Function to check for buzzwords in job details, returns false if any words are found in ghostJobBuzzwords
-function containsBuzzwords(text) {
-    return ghostJobBuzzwords.some(buzzword => text.includes(buzzword));
 }
 
 function analyzeJobPostings() {
@@ -54,28 +60,16 @@ function analyzeJobPostings() {
         });
     }
 
-    if (isReposted) {
-        console.log("Job has been reposted - Flagging as ghost job.");
-    }
+    // Check for vagueness in job description
+    const isVague = checkForVagueness(jobDetailsText);
+    
+    // Add buzzword weight if applicable
+    const buzzwordWeight = containsBuzzwords(jobDetailsText) ? 20 : 0;
 
-    // Check for "Salary Range" text in the specified div
-    const salaryRangeElement = document.querySelector('#job-details');
-    const containsSalaryRange = salaryRangeElement && salaryRangeElement.textContent.includes("Salary Range");
-
-    // If "Salary Range" is found, skip further checks and add the green button directly
-    if (containsSalaryRange) {
-        addJobStatusButton(null, true);
-        return;
-    }
-
-    // Check for presence of buzzwords in job details
-    const buzzwordsElement = document.querySelector('#job-details');
-    const containsBuzzwordsResult = buzzwordsElement && containsBuzzwords(buzzwordsElement.textContent);
-
-    // Check job age and calculate final score if no "Salary Range" is present
+    // Check job age and calculate final score
     const ageScore = evaluateJobAge(jobAgeText);
-    const score = calculateScore(hasSalary, isReposted, ageScore, containsBuzzwordsResult);
-    addJobStatusButton(score, false);
+    const score = calculateScore(hasSalary, isReposted, ageScore, isVague, buzzwordWeight);
+    addJobStatusButton(score);
 }
 
 // Function to evaluate job age
@@ -99,15 +93,30 @@ function evaluateJobAge(jobAgeText) {
     return 0; // Not older than 2 months
 }
 
+// Function to check for vague job postings
+function checkForVagueness(jobDescription) {
+    let vaguenessScore = 0;
+    vagueTerms.forEach(term => {
+        if (jobDescription.toLowerCase().includes(term.toLowerCase())) {
+            vaguenessScore++;
+        }
+    });
+    return vaguenessScore > 3; // Adjust threshold as needed
+}
+
+// Function to check for buzzwords in job postings
+function containsBuzzwords(jobDescription) {
+    return ghostJobBuzzwords.some(term => jobDescription.toLowerCase().includes(term.toLowerCase()));
+}
+
 // Function to calculate the final score based on weighted conditions
-function calculateScore(hasSalary, isReposted, ageScore, containsBuzzwordsResult) {
+function calculateScore(hasSalary, isReposted, ageScore, isVague, buzzwordWeight) {
     let score = 0;
 
     // Define weights
     const salaryWeight = 0.6;
     const repostedWeight = 0.3;
     const ageWeight = 0.1;
-    const buzzwordsWeight = 0.2; // Weight assigned if buzzwords are found
 
     // If no salary, assign a score between 55 and 69, then apply weight
     if (!hasSalary) {
@@ -127,51 +136,54 @@ function calculateScore(hasSalary, isReposted, ageScore, containsBuzzwordsResult
         score += ageScoreValue * ageWeight;
     }
 
-    // If buzzwords are detected, assign a score of 20 and apply weight
-    if (containsBuzzwordsResult) {
-        const buzzwordScore = 20;
-        score += buzzwordScore * buzzwordsWeight;
+    // Add buzzword weight
+    score += buzzwordWeight;
+
+    // If vague, assign a penalty score
+    if (isVague) {
+        score += 10; // Adjust this penalty as needed
     }
 
     // Round score to one decimal place
     return Math.round(score * 10) / 10;
 }
 
-// Add job status button based on the score or detected conditions
-function addJobStatusButton(score, isNotGhostJob) {
+// Add job status button function
+function addJobStatusButton(score) {
     // Remove existing job status button if it exists
     const existingButton = document.querySelector('.job-status-button');
     if (existingButton) {
         existingButton.remove();
     }
 
-    // Create a new button element
+    // Determine button text and color based on score
+    let buttonText = '';
+    let buttonColor = '';
+
+    if (score < 10) {
+        buttonText = 'Nice to Apply';
+        buttonColor = 'green';
+    } else if (score >= 20 && score <= 45) {
+        buttonText = 'You can Apply';
+        buttonColor = 'purple';
+    } else if (score >= 46 && score <= 55) {
+        buttonText = 'Think Before You Apply';
+        buttonColor = 'orange';
+    } else if (score > 55) {
+        buttonText = 'It’s a Red Flag';
+        buttonColor = 'red';
+    }
+
+    // Include ghost job percentage
+    buttonText += ` (${score}% Ghost Job )`;
+
+    // Create a new button element with score
     let jobStatusButton = document.createElement('button');
+    jobStatusButton.textContent = buttonText;
+    jobStatusButton.style.backgroundColor = buttonColor;
+    jobStatusButton.style.color = 'white';
     jobStatusButton.style.marginLeft = '10px';
     jobStatusButton.className = 'job-status-button artdeco-button artdeco-button--primary';
-
-    if (isNotGhostJob) {
-        // If "Salary Range" is found, show "Not a Ghost job" button in green
-        jobStatusButton.textContent = "Not a Ghost Job";
-        jobStatusButton.style.backgroundColor = 'green';
-        jobStatusButton.style.color = 'white';
-    } else if (score !== null) {
-        // Display button with appropriate message and color based on score range
-        if (score < 10) {
-            jobStatusButton.textContent = `Nice to Apply (${score}% Ghost Job)`;
-            jobStatusButton.style.backgroundColor = 'green';
-        } else if (score >= 20 && score <= 45) {
-            jobStatusButton.textContent = `You Can Apply (${score}% Ghost Job)`;
-            jobStatusButton.style.backgroundColor = 'blue';
-        } else if (score >= 46 && score <= 55) {
-            jobStatusButton.textContent = `Think Before You Apply (${score}% Ghost Job)`;
-            jobStatusButton.style.backgroundColor = 'orange';
-        } else if (score > 55) {
-            jobStatusButton.textContent = `It's a Red Flag (${score}% Ghost Job)`;
-            jobStatusButton.style.backgroundColor = 'red';
-        }
-        jobStatusButton.style.color = 'white';
-    }
 
     // Append button to the job details section
     const targetDiv = document.querySelector('.t-24.job-details-jobs-unified-top-card__job-title');
